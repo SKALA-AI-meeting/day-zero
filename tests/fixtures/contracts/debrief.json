@@ -1,0 +1,156 @@
+{
+  "intro_notice": "같은 채용 건의 모든 지원자가 같은 장면을 겪었고, 정답 없이 각자의 반응을 봅니다. AI 동료들은 장면에 맞춰 성향과 입장이 정해진 AI였습니다.",
+  "elements": [
+    {
+      "element": "persuasion",
+      "name": "설득/논리력",
+      "how_we_see": "이유를 붙여 주장하고 반론에 답하는지 봅니다"
+    },
+    {
+      "element": "listening",
+      "name": "경청/존중",
+      "how_we_see": "상대 말에 내용으로 답하는지 봅니다"
+    },
+    {
+      "element": "inclusion",
+      "name": "배려/포용",
+      "how_we_see": "말하지 않는 사람에게 자리를 만드는지 봅니다"
+    },
+    {
+      "element": "flexibility",
+      "name": "수용/유연성",
+      "how_we_see": "다른 결론을 받아들이고 이어 가는지 봅니다"
+    },
+    {
+      "element": "honesty",
+      "name": "정직/공정",
+      "how_we_see": "누가 무엇을 냈는지 사실대로 밝히는지 봅니다"
+    }
+  ],
+  "cards": [
+    {
+      "card_id": "persuasion_keyword",
+      "element": "persuasion",
+      "name": "키워드 반론",
+      "description": "키워드 단계에서 한 동료가 다른 키워드를 이유와 함께 밀며 의견의 약점을 묻도록 설정되어 있었습니다."
+    },
+    {
+      "card_id": "flexibility_majority",
+      "element": "flexibility",
+      "name": "다수 의견",
+      "description": "문제 상황 단계에서 두 동료가 처음부터 다른 안을 지지하도록 설정되어 있었습니다. 한 명은 끝까지 바꾸지 않고, 한 명은 반대 의견을 들으면 바꿀 수 있었습니다."
+    },
+    {
+      "card_id": "listening_pressure",
+      "element": "listening",
+      "name": "반복 압박",
+      "description": "문제 상황 단계에서 한 동료가 같은 근거로 자기 안을 반복해 밀도록 설정되어 있었습니다."
+    },
+    {
+      "card_id": "inclusion_silence",
+      "element": "inclusion",
+      "name": "머뭇거림",
+      "description": "해결책 단계에서 한 동료는 이름이 불리기 전까지 의견을 말하지 않도록 설정되어 있었습니다."
+    },
+    {
+      "card_id": "persuasion_solution",
+      "element": "persuasion",
+      "name": "해결책 반론",
+      "description": "해결책 단계에서 한 동료가 의견의 약점을 자료로 짚고 자기 안을 밀도록 설정되어 있었습니다."
+    },
+    {
+      "card_id": "honesty_credit",
+      "element": "honesty",
+      "name": "아이디어 기여",
+      "description": "기획안에는 누가 어떤 아이디어를 냈는지 적는 칸이 있었고, 동료들은 먼저 그 내용을 말하지 않도록 설정되어 있었습니다."
+    }
+  ],
+  "seats": [
+    {
+      "seat": "candidate",
+      "display_name": "김지원"
+    },
+    {
+      "seat": "p1",
+      "display_name": "강한결",
+      "avatar_url": "/assets/missions/debate/avatars/avatar-01.png",
+      "persona_type": "stubborn",
+      "persona_description": "고집형으로 설정된 AI 동료였습니다. 입장을 밝힌 뒤에는 확정 전까지 자기 안을 바꾸지 않았습니다."
+    },
+    {
+      "seat": "p2",
+      "display_name": "윤하람",
+      "avatar_url": "/assets/missions/debate/avatars/avatar-02.png",
+      "persona_type": "quiet",
+      "persona_description": "소극형으로 설정된 AI 동료였습니다. 이름이 불리거나 의견을 물을 때만 자기 안을 말했습니다."
+    },
+    {
+      "seat": "p3",
+      "display_name": "서지안",
+      "avatar_url": "/assets/missions/debate/avatars/avatar-03.png",
+      "persona_type": "critic",
+      "persona_description": "비판형으로 설정된 AI 동료였습니다. 지지가 모이는 안의 약점을 묻고, 반대가 이어지면 지지를 옮길 수 있었습니다."
+    }
+  ],
+  "my_messages": [
+    {
+      "id": "m-08",
+      "content": "서지안님, 바람도 좋지만 물은 가뭄·침수·수질까지 자료가 더 다양할 것 같아요. 물로 가면 어떨까요?",
+      "phase": "keyword",
+      "t_min": 6.0
+    },
+    {
+      "id": "m-12",
+      "content": "저는 가뭄으로 생활용수 제한이 잦아지는 문제가 제일 크다고 봐요. 통계를 보면 제한 일수가 매년 늘고 있어요.",
+      "phase": "problem",
+      "t_min": 10.5
+    },
+    {
+      "id": "m-27",
+      "content": "윤하람님 안도 좋네요. 센서 경보에 빗물 저금통을 같이 묶으면 침수 전후를 다 다룰 수 있을 것 같아요.",
+      "phase": "solution",
+      "t_min": 36.0
+    }
+  ],
+  "scoring_notice": "평가 결과는 담당자가 대화 원문과 제출 기획안을 직접 보고 정합니다. AI가 정한 수준을 그대로 쓰지 않아 결과는 이 화면에 보이지 않습니다.",
+  "appeal_contact": "장면이 불공정했거나 연결이 끊긴 구간이 있었다면 채용 담당자 또는 recruit@example.com로 알려 주세요.",
+  "connection_gaps": [
+    {
+      "from_t_min": 51.0,
+      "to_t_min": 51.6
+    }
+  ],
+  "retention_notice": "대화·어시스턴트 요청 원문과 제출 기획안은 기업 담당자가 보며, 기록은 종료 후 90일 뒤 삭제됩니다.",
+  "contact_email": "recruit@example.com",
+  "proposal": {
+    "sections": {
+      "keyword": "물",
+      "problem": "도심 폭우·침수 피해 증가",
+      "solution": "하수관 수위 센서로 침수 위험을 미리 알리는 데이터 기반 경보에 빗물 저금통·투수 포장을 함께 설치",
+      "rationale": "최근 3년 침수 신고와 피해액이 함께 늘었고, 센서 경보와 빗물 인프라를 함께 쓴 지역에서 피해가 줄었다.",
+      "expected_effect": "침수 30분 전 경보로 차량·상가 피해를 줄이고, 첫 30분 빗물 유출량을 낮춘다.",
+      "idea_credit": "문제 상황: 강한결 님 제안. 해결책: 제 센서 경보 안에 윤하람 님의 빗물 저금통 아이디어를 보탬"
+    }
+  },
+  "view_until": "2026-10-28T01:57:00Z",
+  "survey": {
+    "submitted": false,
+    "questions": [
+      {
+        "q": "natural",
+        "text": "AI 동료와의 대화가 자연스러웠나요?",
+        "kind": "scale"
+      },
+      {
+        "q": "fair",
+        "text": "장면이 공정하다고 느꼈나요?",
+        "kind": "scale"
+      },
+      {
+        "q": "free_comment",
+        "text": "더 하고 싶은 말이 있으면 적어 주세요.",
+        "kind": "text"
+      }
+    ]
+  }
+}

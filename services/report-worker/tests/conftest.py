@@ -1,0 +1,258 @@
+"""워커 테스트 공용 픽스처: 공용 계약 픽스처(tests/fixtures/contracts/)의 세션 sess-1, FakeLLM,
+가짜 assessment-mcp, 가짜 내부 API, 메모리 체크포인터로 조립한 그래프와 소비자.
+
+가짜 assessment와 가짜 api는 같은 평가 저장소를 본다(api의 evaluation_runs·evaluations 행).
+draft·final 규칙은 contracts.md 내부 REST와 같다(final 해시가 draft와 다르면 409 draft_mismatch).
+"""
+
+import copy
+import hashlib
+import importlib.util
+import json
+import re
+from typing import Any
+
+import httpx
+import pytest
+from langgraph.checkpoint.memory import InMemorySaver
+from report_worker.api import ApiError
+from report_worker.config import REPO_ROOT
+from report_worker.consumer import ReportWorker
+from report_worker.graph import Deps, build_graph
+from report_worker.llm import Completion
+
+CONTRACTS = REPO_ROOT / "tests" / "fixtures" / "contracts"
+SCENARIOS = REPO_ROOT / "scenarios"
+
+
+def load(name: str) -> Any:
+    return json.loads((CONTRACTS / f"{name}.json").read_text(encoding="utf-8"))
+
+
+def _load_module(name: str, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+contract = _load_module("contract_shape", REPO_ROOT / "tests" / "contract_shape.py")
+
+
+def content_hash(content: dict[str, Any]) -> str:
+    canonical = json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def element_outputs() -> dict[str, dict[str, Any]]:
+    """계약 픽스처 평가(internal_evaluations)를 요소별 LLM 출력 JSON으로 나눈다(워커 검증 통과)."""
+    saved = load("internal_evaluations")
+    rubric = load("internal_rubric")
+    owner = {d["dimension_id"]: e["element"] for e in rubric["elements"] for d in e["dimensions"]}
+    outputs = {
+        e["element"]: {"element": e["element"], "summary": e["summary"], "dimensions": []}
+        for e in saved["elements"]
+    }
+    for row in saved["dimensions"]:
+        outputs[owner[row["dimension_id"]]]["dimensions"].append({"no_record_reason": None, **row})
+    return outputs
+
+
+ELEMENT_LINE = re.compile(r"^\[요소\] (\w+)", re.M)
+
+
+class FakeLLM:
+    """요소별 출력. `script[element]`가 있으면 호출마다 앞에서 하나씩 꺼낸다(문자열·객체·예외)."""
+
+    model = "gpt-4o-mini"
+    temperature = 0.1
+
+    def __init__(self, outputs: dict[str, Any] | None = None) -> None:
+        self.outputs = outputs or element_outputs()
+        self.script: dict[str, list[Any]] = {}
+        self.calls: list[tuple[str, str, str]] = []  # (element, system, user)
+        self.fail_next: list[Exception] = []
+
+    async def complete(self, system: str, user: str) -> Completion:
+        element = ELEMENT_LINE.search(user).group(1)
+        self.calls.append((element, system, user))
+        if self.fail_next:
+            raise self.fail_next.pop(0)
+        queue = self.script.get(element)
+        out = queue.pop(0) if queue else self.outputs[element]
+        if isinstance(out, Exception):
+            raise out
+        text = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+        return Completion(text=text, tokens_in=100, tokens_out=50)
+
+
+class Store:
+    """api DB의 평가 실행 행(run_id → EvaluationSave 본문)."""
+
+    def __init__(self) -> None:
+        self.evaluations: dict[str, dict[str, Any]] = {}
+
+
+class FakeAssessment:
+    def __init__(self, store: Store) -> None:
+        self.store = store
+        self.record = load("session_record")
+        self.rubric = load("internal_rubric")
+        self.contributions = load("internal_contributions")
+        self.calls: list[str] = []
+        self.saved: list[dict[str, Any]] = []
+
+    async def get_session_record(self, session_id: str) -> dict[str, Any]:
+        self.calls.append("get_session_record")
+        return copy.deepcopy(self.record)
+
+    async def get_rubric(self, session_id: str) -> dict[str, Any]:
+        self.calls.append("get_rubric")
+        return copy.deepcopy(self.rubric)
+
+    async def get_contributions(self, session_id: str) -> dict[str, Any]:
+        self.calls.append("get_contributions")
+        return copy.deepcopy(self.contributions)
+
+    async def get_transcript_span(
+        self, session_id: str, message_id: str, before: int = 5, after: int = 3
+    ) -> dict[str, Any]:
+        self.calls.append("get_transcript_span")
+        messages = self.record["messages"]
+        index = next(i for i, m in enumerate(messages) if m["id"] == message_id)
+        return {
+            "target": messages[index],
+            "before": messages[max(0, index - before) : index],
+            "after": messages[index + 1 : index + 1 + after],
+        }
+
+    async def save_evaluation(self, body: dict[str, Any]) -> dict[str, Any]:
+        self.calls.append("save_evaluation")
+        self.saved.append(copy.deepcopy(body))
+        run_id = body["run_id"]
+        if run_id in self.store.evaluations:
+            return {"run_id": run_id, "existing": True, "saved": 0}
+        self.store.evaluations[run_id] = copy.deepcopy(body)
+        return {"run_id": run_id, "existing": False, "saved": len(body["dimensions"])}
+
+
+class FakeApi:
+    def __init__(self, store: Store) -> None:
+        self.store = store
+        self.session = load("internal_session")
+        self.session["status"] = "completed"
+        self.drafts: list[tuple[dict[str, Any], dict[str, Any] | None]] = []
+        self.finals: list[dict[str, Any]] = []
+        self.failed: list[str] = []
+        self.down = False  # True면 쓰기 호출이 연결 실패
+        self.evaluation_reads = 0
+
+    def _check(self) -> None:
+        if self.down:
+            raise httpx.ConnectError("api down")
+
+    async def get_session(self, session_id: str) -> dict[str, Any]:
+        return copy.deepcopy(self.session)
+
+    async def assistant_calls(self, session_id: str) -> list[dict[str, Any]]:
+        return load("internal_assistant_calls")
+
+    async def all_messages(self, session_id: str) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": "ma-1",
+                "sender": "candidate",
+                "content": "도심 침수 사례에서 센서 경보 효과를 알려 줘",
+            },
+            {
+                "id": "ma-2",
+                "sender": "system",
+                "content": "자료에 센서 경보로 피해가 줄었다는 내용이 있어요.",
+            },
+        ]
+
+    async def get_evaluation(self, session_id: str, run_id: str) -> dict[str, Any] | None:
+        self.evaluation_reads += 1
+        body = self.store.evaluations.get(run_id)
+        if body is None:
+            return None
+        failed = any(d["no_record_reason"] == "evaluate_failed" for d in body["dimensions"])
+        keys = ("run_id", "rubric_version", "prompt_versions", "model", "elements", "dimensions")
+        return {
+            **{k: copy.deepcopy(body[k]) for k in keys},
+            "has_failed": failed,
+            "created_at": "x",
+        }
+
+    async def save_draft(self, session_id, content, usage):
+        self._check()
+        self.drafts.append((copy.deepcopy(content), usage))
+        return {"status": "report_ready"}
+
+    async def save_final(self, session_id, content):
+        self._check()
+        if content_hash(content) != content_hash(self.drafts[-1][0]):
+            raise ApiError(409, "conflict", "draft_mismatch")
+        self.finals.append(copy.deepcopy(content))
+        return {"status": "reviewed", "reviewed_at": "2026-10-21T03:10:00Z"}
+
+    async def report_failed(self, session_id, error):
+        self._check()
+        self.failed.append(error)
+        return {"status": "failed"}
+
+
+class Harness:
+    def __init__(self) -> None:
+        self.store = Store()
+        self.llm = FakeLLM()
+        self.assessment = FakeAssessment(self.store)
+        self.api = FakeApi(self.store)
+        self.published: list[tuple[str, dict[str, Any]]] = []
+        self.sleeps: list[float] = []
+        self.new_graph()
+
+    def new_graph(self) -> None:
+        """새 체크포인터로 그래프를 다시 만든다(프로세스 재시작·체크포인트 유실 흉내)."""
+        deps = Deps(self.api, self.assessment, self.llm, SCENARIOS)
+        self.graph = build_graph(deps, InMemorySaver())
+
+        async def publish(queue: str, body: dict[str, Any]) -> None:
+            self.published.append((queue, body))
+
+        async def sleep(seconds: float) -> None:
+            self.sleeps.append(seconds)
+
+        self.worker = ReportWorker(self.graph, self.api, publish, sleep=sleep)
+
+    async def generate(self, eval_round: int = 1, attempt: int = 1) -> None:
+        body = {"session_id": "sess-1", "attempt": attempt, "eval_round": eval_round}
+        await self.worker.handle("report.generate", body, self.worker.generate)
+
+    async def approve(self, eval_round: int = 1, attempt: int = 1) -> None:
+        body = {"session_id": "sess-1", "attempt": attempt, "eval_round": eval_round}
+        await self.worker.handle("report.approve", body, self.worker.approve)
+
+
+@pytest.fixture
+def h() -> Harness:
+    return Harness()
+
+
+def merged_report(draft: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
+    """api가 GET 때 병합하는 필드를 더해 Report 계약 형태로 만든다(조정 없음)."""
+    report = copy.deepcopy(draft)
+    for element in report["elements"]:
+        element["adjusted_level"] = None
+    for dimension in report["dimensions"]:
+        dimension.update(adjusted_level=None, adjusted_no_record_reason=None, adjust_memo=None)
+    report["debrief"]["survey"] = None
+    report.update(
+        proposal=record["proposal"],
+        review=None,
+        notes=[],
+        connection_gaps=record["session"]["connection_gaps"],
+        reviewed_at=None,
+        purge_at=None,
+    )
+    return report

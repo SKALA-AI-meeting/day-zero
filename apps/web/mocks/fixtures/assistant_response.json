@@ -1,0 +1,16 @@
+{
+  "call_id": "ac-1",
+  "message_id": "ma-2",
+  "content": "도심 침수 사례 자료에 하수관 수위 센서로 침수 30분 전 경보를 보낸 구에서 차량 침수 피해가 줄었다는 내용이 있어요.",
+  "cited_material_ids": ["water_flood_cases"],
+  "tool_calls": [
+    {
+      "name": "search_materials",
+      "query": "침수 센서 경보 효과"
+    },
+    {
+      "name": "get_material",
+      "material_id": "water_flood_cases"
+    }
+  ]
+}

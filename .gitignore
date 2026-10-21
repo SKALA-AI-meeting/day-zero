@@ -1,0 +1,24 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.next/
+.DS_Store
+*.worktrees/
+
+# 로컬 설치 디자인 스킬(npx skills add emilkowalski/skills)
+apps/web/.agents/
+apps/web/.claude/
+apps/web/skills-lock.json
+docs/handoff/reviews/uiux-shots/
+docs/handoff/reports/web-polish-shots/
+
+# 실행·검증 중 생성되는 로컬 산출물
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo
+REVIEW.md
+tests/e2e/records/

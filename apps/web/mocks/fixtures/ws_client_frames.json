@@ -1,0 +1,21 @@
+[
+  {
+    "type": "message.send",
+    "payload": {
+      "client_msg_id": "c-03",
+      "content": "저는 가뭄으로 생활용수 제한이 잦아지는 문제가 제일 크다고 봐요. 통계를 보면 제한 일수가 매년 늘고 있어요."
+    }
+  },
+  {
+    "type": "typing",
+    "payload": {
+      "state": "start"
+    }
+  },
+  {
+    "type": "typing",
+    "payload": {
+      "state": "stop"
+    }
+  }
+]
