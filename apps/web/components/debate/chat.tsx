@@ -247,7 +247,7 @@ export function ChatRoom({
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface" aria-label="토론방">
-      <header className="flex items-center gap-3 border-b border-line px-5 py-3">
+      <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3">
         <h2 className="text-callout font-semibold">새 프로젝트 팀</h2>
         <AvatarGroup
           size={20}
@@ -352,7 +352,7 @@ function Composer({
 
   return (
     <form
-      className="flex items-end gap-2 border-t border-line px-4 py-3"
+      className="flex shrink-0 items-end gap-2 border-t border-line bg-surface px-4 py-3"
       onSubmit={(event) => {
         event.preventDefault();
         send();

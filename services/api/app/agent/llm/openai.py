@@ -47,7 +47,8 @@ class OpenAILLM(BaseLLM):
                 "type": "json_schema",
                 "json_schema": {"name": "output", "schema": schema, "strict": True},
             }
-        elif json_mode:
+        elif json_mode and not tools:
             kwargs["response_format"] = {"type": "json_object"}
-        runnable = self._chat.bind_tools(tools, **kwargs) if tools else self._chat.bind(**kwargs)
+        # 도구 사용 턴은 JSON 출력 프롬프트를 따르고, 도구 없는 턴에만 response_format을 적용한다.
+        runnable = self._chat.bind_tools(tools).bind(**kwargs) if tools else self._chat.bind(**kwargs)
         return await runnable.ainvoke(messages, config=config)
